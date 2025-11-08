@@ -7,7 +7,9 @@ from PIL import Image
 import os
 
 def main():
-    DATA_PATH = "AIAtl/splitData/cardboard_split"
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    DATA_PATH = os.path.join(script_dir, "splitData")
     IMG_SIZE = 224
     BATCH_SIZE = 8
     EPOCHS = 5
@@ -29,6 +31,15 @@ def main():
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    # Print dataset information
+    print(f"Dataset loaded from: {DATA_PATH}")
+    print(f"Number of categories: {len(train_dataset.classes)}")
+    print(f"Categories: {train_dataset.classes}")
+    print(f"Training samples: {len(train_dataset)}")
+    print(f"Validation samples: {len(val_dataset)}")
+    print(f"Test samples: {len(test_dataset)}")
+    print(f"Using device: {device}\n")
     model = mobilenet_v3_small(weights="IMAGENET1K_V1")
 
     # Freeze backbone
@@ -72,8 +83,14 @@ def main():
         avg_loss = running_loss / len(train_loader) if len(train_loader) > 0 else 0.0
         print(f"Epoch {epoch+1} finished. Avg Loss: {avg_loss:.4f}, Val Acc: {val_acc:.2f}%\n")
 
-    torch.save(model.state_dict(), "AIAtl/model/mobilenetv3_ewaste.pth")
-    print("Model saved.")
+    # Create model directory if it doesn't exist
+    model_dir = os.path.join(script_dir, "model")
+    os.makedirs(model_dir, exist_ok=True)
+    
+    model_path = os.path.join(model_dir, "mobilenetv3_recyclable_classifier.pth")
+    torch.save(model.state_dict(), model_path)
+    print(f"Model saved to {model_path}.")
+    print(f"Model trained on {num_classes} categories: {train_dataset.classes}")
 
 if __name__ == "__main__":
     main()
