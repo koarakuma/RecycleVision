@@ -163,7 +163,7 @@ def get_model(script_dir=None):
         model_path = os.path.join(model_dir, "mobilenetv3_recyclable_classifier.pth")
         
         if not os.path.exists(model_path):
-            best_model_path = os.path.join(model_dir, "mobilenetv3_recyclable_classifier.pth")
+            best_model_path = os.path.join(model_dir, "mobilenetv3_recyclable_classifier_best.pth")
             if os.path.exists(best_model_path):
                 model_path = best_model_path
         

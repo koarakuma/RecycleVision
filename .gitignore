@@ -11,3 +11,4 @@ data/
 *.pth
 splitData/ 
 *.DS_Store
+__pycache__/
