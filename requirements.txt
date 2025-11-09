@@ -1,4 +1,6 @@
 torch
 torchvision
-PIL
-os 
+Pillow
+streamlit
+requests
+python-dotenv

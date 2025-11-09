@@ -32,15 +32,16 @@ def main():
     
     IMG_SIZE = 224
     BATCH_SIZE = 32
-    EPOCHS = 10
+    EPOCHS = 15  # Increased epochs for better training
     NUM_WORKERS = 0  # safe for Mac
 
-    # Data augmentation for training
+    # Data augmentation for training - enhanced to help distinguish similar materials
     train_transform = transforms.Compose([
-        transforms.RandomResizedCrop(IMG_SIZE),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(15),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2),
+        transforms.RandomResizedCrop(IMG_SIZE, scale=(0.7, 1.0)),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomRotation(degrees=20),
+        transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
+        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225])
@@ -95,20 +96,51 @@ def main():
     
     model = mobilenet_v3_small(weights="IMAGENET1K_V1")
 
-    # Freeze backbone for faster training (unfreeze if you want to fine-tune the whole model)
-    for param in model.features.parameters():
-        param.requires_grad = False
+    # Fine-tuning strategy: freeze early layers, unfreeze later layers
+    # MobileNet v3 has blocks - we'll unfreeze the last few blocks
+    total_blocks = len(list(model.features.children()))
+    # Unfreeze last 2-3 blocks for better adaptation
+    blocks_to_unfreeze = 3
+    
+    for i, (name, child) in enumerate(model.features.named_children()):
+        if i >= total_blocks - blocks_to_unfreeze:
+            # Unfreeze last blocks
+            for param in child.parameters():
+                param.requires_grad = True
+        else:
+            # Freeze early blocks
+            for param in child.parameters():
+                param.requires_grad = False
+    
+    print(f"Unfrozen last {blocks_to_unfreeze} feature blocks for fine-tuning")
 
     num_classes = len(train_dataset.classes)
     in_features = model.classifier[-1].in_features
     model.classifier[-1] = nn.Linear(in_features=in_features, out_features=num_classes)
     model = model.to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    # Calculate class weights to handle any imbalance
+    from collections import Counter
+    train_labels = [label for _, label in train_dataset]
+    class_counts = Counter(train_labels)
+    total_samples = len(train_labels)
+    num_classes = len(train_dataset.classes)
+    
+    # Calculate weights: inverse frequency (more samples = lower weight)
+    class_weights = []
+    for i in range(num_classes):
+        count = class_counts.get(i, 1)
+        weight = total_samples / (num_classes * count)
+        class_weights.append(weight)
+    
+    class_weights_tensor = torch.FloatTensor(class_weights).to(device)
+    print(f"Class weights: {dict(zip(train_dataset.classes, [f'{w:.2f}' for w in class_weights]))}")
+    
+    criterion = nn.CrossEntropyLoss(weight=class_weights_tensor)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     
-    # Learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+    # Learning rate scheduler - slower decay
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.5)
 
     print("Starting training...\n")
     
