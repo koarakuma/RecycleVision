@@ -2,14 +2,28 @@ import io
 import os
 import json
 from datetime import datetime
+from dotenv import load_dotenv
 
 import requests
 from PIL import Image
 import streamlit as st
 
-# Import model predictor
+from openai import OpenAI
+
+# Load the .env file
+load_dotenv()
+
+# Get the key safely
+api_key = os.getenv("OPENAI_API_KEY")
+
+if not api_key:
+    raise ValueError("❌ OPENAI_API_KEY not found! Check your .env file location or spelling.")
+
+# Initialize OpenAI client
+client = OpenAI(api_key=api_key)
+
 MODEL_AVAILABLE = False
-try:
+try: #importing our helper module for connecting to our model
     from model_predictor import get_model, predict_image
     MODEL_AVAILABLE = True
 except ImportError:
@@ -34,7 +48,7 @@ st.markdown(
 )
 
 st.markdown("<h1 class='centered-title'>RecycleVision</h1>", unsafe_allow_html=True)
-st.markdown("<p class='subtitle'>Snap a photo → AI identifies recyclable materials & categories</p>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle'>Snap a photo → Find the recycling category for you! </p>", unsafe_allow_html=True)
 st.divider()
 
 # -------------- Sidebar --------------
@@ -193,43 +207,18 @@ if analyze_clicked:
                     payload = predict_image(model, image, class_names, device)
                     
                     material = payload.get("predicted_class", "").lower()
+                    print(material)
                     tips = []
-                    if "plastic" in material:
-                        tips = [
-                            "Check local recycling guidelines for plastic types.",
-                            "Rinse containers before recycling.",
-                            "Remove caps and labels if required."
-                        ]
-                    elif "glass" in material:
-                        tips = [
-                            "Rinse glass containers thoroughly.",
-                            "Remove metal caps and labels.",
-                            "Don't break glass - recycle whole."
-                        ]
-                    elif "metal" in material or "aluminum" in material:
-                        tips = [
-                            "Rinse metal containers.",
-                            "Aluminum cans are highly recyclable.",
-                            "Check if local program accepts metal."
-                        ]
-                    elif "paper" in material or "cardboard" in material:
-                        tips = [
-                            "Keep paper dry and clean.",
-                            "Remove plastic wrap or tape.",
-                            "Flatten cardboard boxes."
-                        ]
-                    elif "e-waste" in material or "electronic" in material:
-                        tips = [
-                            "E-waste requires special handling.",
-                            "Find local e-waste recycling centers.",
-                            "Don't throw electronics in regular trash."
-                        ]
-                    elif "organic" in material:
-                        tips = [
-                            "Compost organic materials if possible.",
-                            "Check local composting programs.",
-                            "Remove any non-organic materials."
-                        ]
+                    if material:
+                        response = client.chat.completions.create(
+                            model="gpt-4o-mini",  # lightweight, fast model; good choice
+                            messages=[
+                                {"role": "system", "content": "You are a helpful recycling assistant."},
+                                {"role": "user", "content": f"What are some tips for recycling objects made of {material}?"}
+                            ],
+                        )
+                        tips = [response.choices[0].message.content]
+                        print(tips)
                     else:
                         tips = [
                             "Check local recycling guidelines.",
