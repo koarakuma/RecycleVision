@@ -4,3 +4,5 @@ Pillow
 streamlit
 requests
 python-dotenv
+rembq
+albumentations
